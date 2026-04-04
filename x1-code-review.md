@@ -14,56 +14,51 @@
 
 ## Purpose
 
-This checklist is used for:
-1. **Reviewing implementation plan code snippets** before they're implemented
-2. **Reviewing implemented code** before committing to git
+Review **implementation plan code snippets** before they're implemented. This is a pre-implementation review, not a git diff review. The goal is to catch issues in the plan's proposed code before any code is written.
 
-**Primary reviewer:** AI assistants analyzing code changes.
+**Primary reviewer:** AI assistants analyzing implementation plan documents.
+
+---
+
+## Scope
+
+1. Find the active implementation plan (check `.claude/plans/` or ask user which plan to review)
+2. Extract all code snippets from the plan
+3. Review each snippet against this checklist
+4. For every snippet, verify against the actual codebase (signatures, field names, patterns)
 
 ---
 
 ## Code Reuse (MANDATORY)
 
-Before approving ANY new code, the reviewer MUST:
+Before approving ANY proposed new code in the plan, the reviewer MUST:
 
 1. **Search the codebase** for existing implementations that solve the same problem
 2. **Check existing services, repositories, utilities, components** for reuse opportunities
-3. **Understand existing patterns** - new code must follow established conventions
-4. **Reject code that duplicates** functionality available elsewhere
-
-**For implementation plans:** Flag any proposed new file/class/function that may already exist.
-**For code changes:** Verify the author searched before creating new abstractions.
+3. **Understand existing patterns** - proposed code must follow established conventions
+4. **Flag any proposed new file/class/function** that may already exist in the codebase
 
 If unsure whether something exists: **search first, approve later.**
 
 ---
 
-## Scope Selection
-
-Ask if unclear: **"What should I review?"**
-- Git changes since last commit?
-- Specific files or features?
-- Implementation plan code snippets?
-
----
-
 ## Instructions
 
-1. Identify the scope (ask if unclear)
-2. Apply Chaos Demon methodology
-3. **IDENTIFY issues, then FIX them** immediately
-4. Re-audit after fixes to ensure no new bugs introduced
-5. Summarize what was reviewed and fixed
+1. Read the implementation plan
+2. For each code snippet, verify method signatures, field names, and types against the actual codebase
+3. Apply Chaos Demon methodology to each snippet
+4. **IDENTIFY issues, then propose fixes** (update the plan snippets directly)
+5. Re-audit after fixes to ensure no new issues introduced
+6. Summarize what was reviewed and fixed
 
 ---
 
 ## Pre-Review Gate
 
-Before detailed review, verify:
-- [ ] Build passes
-- [ ] Linter passes
-- [ ] Tests pass
-- [ ] PR <500 lines (flag for splitting if larger)
+Before detailed review, verify the plan:
+- [ ] Has clear IMP items with traceability to user stories/ACs
+- [ ] Code snippets reference real files, methods, and types
+- [ ] No snippets use assumed signatures without [VERIFIED] or [CONCEPTUAL] tags
 
 ---
 

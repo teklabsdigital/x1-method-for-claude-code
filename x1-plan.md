@@ -89,6 +89,55 @@ You are not a passive scribe waiting for the user to dictate stories. You are an
 - **Questions the "so that":** If the benefit is vague ("so that it works better"), push for specificity.
 - **Eliminates gold-plating:** If an AC describes a nice-to-have, challenge whether it belongs in this iteration.
 
+**Roles must be human stakeholders.**
+- The role in "As [role]" must be a real human: developer, operator, business owner, end user, support agent, etc.
+- "As the system" and "As an AI agent" are **never valid roles**. Reframe: who is the human that observes, benefits from, or is harmed by this behavior?
+- For internal/infrastructure work, the stakeholder is typically a developer (maintainability, testability) or an operator (reliability, observability).
+- Example reframe: "As the system, I need context compaction..." becomes "As an operator, I need the system to manage conversation context size, so that agents don't exceed model limits and fail silently."
+
+**Acceptance criteria must describe testable end-to-end outcomes, not implementation details.**
+- ACs can be technical, but they must test the pipeline across service boundaries, not a single unit in isolation.
+- ACs must not name specific classes, methods, fields, parameters, or database columns. Those details belong in the IMP checklist.
+- Litmus test: can this AC be verified by an integration/E2E test that exercises the real flow across service boundaries? If it can only be verified by inspecting a single class's internal state, it's an implementation detail, not an acceptance criterion.
+- ACs feed directly into `/x1-test-plan` which builds acceptance tests from them. "Field X added to class Y" produces a trivial unit assertion. "Given X, when Y, then Z is observable" produces a test that catches real seam failures.
+- **Why this matters:** Testing breaks down at the seams between services. An AC that names a single class drives a unit test for that class. An AC that describes an E2E outcome drives an integration test that catches the real failures: incorrect handoffs, stale state, missing wiring, broken DI.
+
+**Bad example (system perspective, unit-level ACs, no epoch):**
+```
+US-1: Agent Retains Conversation Context Between Turns
+As an AI agent, I need my conversation context to persist in my
+in-memory message buffer across turns...
+
+AC-1.1: After a multi-turn completes, assistant responses and tool
+results from StepFinishEvent.NewMessages are added to the instance's
+_messages list.
+
+AC-1.2: AgentInstanceRecord.LastContextSizeTokens is updated after
+each multi-turn with the last step's InputTokens.
+```
+Problems: "As an AI agent" is not a human. ACs name internal classes/fields. Tests would only verify a single unit's state, missing seam failures. IDs will collide with every other plan's US-1.
+
+**Good example (human perspective, E2E ACs, epoch-scoped):**
+```
+Epoch: CTX
+
+US-CTX-1: Agents Remember Prior Conversation
+As an operator, I need agents to retain conversation context across
+turns, so that they don't repeat questions or lose track of prior work.
+
+AC-CTX-1.1: Given a multi-turn conversation, when the agent receives
+a follow-up referencing earlier context, the agent responds using that
+context without re-fetching data.
+
+AC-CTX-1.2: Context size is tracked per instance so compaction
+decisions can be made without loading full message history.
+
+AC-CTX-1.3: When context exceeds the compaction threshold, the system
+compacts before the next execution, and the agent continues
+functioning with the compacted context.
+```
+ACs are technical but testable E2E. They exercise hydration + execution + persistence together, catching seam failures. Epoch-scoped IDs are unique across all plans.
+
 **The goal is the MINIMAL set of stories that captures the FULL problem. Not more, not fewer.**
 
 **Process:**
@@ -116,26 +165,30 @@ You are not a passive scribe waiting for the user to dictate stories. You are an
 ```
 ## User Stories (APPROVED)
 
-### US-1: [Title]
-**As** [role], **I want** [capability], **so that** [benefit].
+**Epoch:** {PREFIX} (short code derived from feature name, e.g. CTX, AUTH, VC)
+
+### US-{PREFIX}-1: [Title]
+**As** [human stakeholder role], **I want** [capability], **so that** [benefit].
 
 **Acceptance Criteria:**
-- AC-1: [Specific, testable criterion]
-- AC-2: [Specific, testable criterion]
+- AC-{PREFIX}-1.1: [Testable end-to-end outcome]
+- AC-{PREFIX}-1.2: [Testable end-to-end outcome]
 
-### US-2: [Title]
+### US-{PREFIX}-2: [Title]
 ...
 
 **User confirmed: [date/time or "Yes, approved"]**
 ```
 
 **Rules:**
+- Define the **epoch prefix** before writing any stories. Derive it from the feature name (2-4 uppercase letters). All IDs use this prefix throughout the plan.
 - Do NOT investigate the codebase until user stories are approved
-- Do NOT reference file paths, class names, or technical implementation
+- Do NOT reference file paths, class names, or technical implementation in stories or ACs
 - Do NOT write code snippets or propose architecture
 - Do NOT discuss "how" until the "what" is locked
-- Acceptance criteria must be specific and testable
-- Each AC drives at least one IMP item and ideally one test
+- Roles must be **human stakeholders**, never "the system" or "an AI agent"
+- ACs must describe **testable E2E outcomes** that exercise the real flow across service boundaries. No class names, method names, field names, or database columns in ACs.
+- Each AC drives a [TEST]+[CODE] IMP pair (TDD: test written first)
 - Push back on stories that are too broad, too narrow, or unnecessary
 - Every story must justify its existence: what do we lose if we cut it?
 
@@ -318,6 +371,22 @@ API Integration Tests -> Full HTTP pipeline with in-memory DB and mocked externa
 - What mocks are needed, and do the interfaces already exist?
 - What side effects should the test verify? (e.g. "monologue was appended", "ChannelMessage was created")
 
+### Test-Driven Development (MANDATORY)
+
+This project uses TDD. The plan must produce IMP items that enforce the red-green cycle.
+
+**What TDD means for planning:**
+- Each AC is a test specification. The plan's job is to make ACs precise enough that a failing test can be written directly from the AC, before any implementation code exists.
+- The IMP checklist pairs [TEST] and [CODE] items per AC. The test comes first.
+- "Testability by Design" (above) ensures the architecture supports TDD. This section ensures the plan enforces it.
+
+**ACs that resist TDD are a design smell:**
+- If you can't write a failing test from an AC, the AC is too vague. Tighten it.
+- If the test requires complex setup across many services, the architecture has too much coupling. Revisit service boundaries.
+- If the only way to test is to inspect internal state, the behavior isn't observable enough. Add an observable output (return value, event, log, persisted state).
+
+**Exempt from TDD:** Pure infrastructure (DI wiring, config, migrations). These are tested implicitly when the first [TEST] item runs.
+
 ### Architecture Stress Testing (MANDATORY)
 
 **After the first-pass architecture is designed, stress test it with end-to-end scenarios before writing code snippets.**
@@ -380,6 +449,31 @@ A service with 8 injected dependencies is a service trying to do too much. Befor
 - Can the core logic be tested without mocking anything? (Extract pure functions.)
 - Does this service mix decisions with side effects? (Split them.)
 - Would a new developer understand this service's purpose from the constructor alone?
+
+### Architectural Principles Compliance (MANDATORY)
+
+The plan MUST comply with the project's architectural principles defined in `docs/architecture/architectural-principles.md`. During architecture design, verify each principle:
+
+**Architectural Requirements:**
+- **AR-1 Single Responsibility:** Each new component owns exactly one concern. Constructor dependencies reveal scope.
+- **AR-2 Dependency Inversion:** All collaborators are interfaces. No concrete dependencies.
+- **AR-3 Composition Over Inheritance:** Compose through injection, not class hierarchies.
+- **AR-4 Open-Closed Principle:** New capabilities via extension, not modification of existing components.
+- **AR-5 Explicit State Machines:** Lifecycle states are explicit with defined transitions. No implied state from booleans.
+- **AR-6 Event-Driven Architecture:** Activity produces events through a pipeline. Producers don't know consumers.
+- **AR-7 Provider Encapsulation:** Providers own retry, fallback, and recovery internally.
+
+**Non-Functional Requirements:**
+- **NFR-1 Testability:** Max 5 mocked dependencies per component. Pure decision logic extracted as pure functions.
+- **NFR-2 Observability:** Every state transition and decision logged with structured context.
+- **NFR-3 Resilience:** Transient failures retried. Permanent failures surfaced as events. No silent failures.
+- **NFR-4 Resource Efficiency:** Idle resources unloaded. Bounded in-memory counts.
+- **NFR-5 Concurrency Safety:** Mutual exclusion via state machines. Thread-safe collections for queuing.
+- **NFR-6 Persistence and Recovery:** Persisted state is source of truth. Incremental persistence. Lazy reload.
+- **NFR-7 Real-Time Responsiveness:** Events stream with minimal latency. No buffering.
+- **NFR-8 Deterministic Lifecycle:** No ambiguous states. Invalid transitions throw.
+
+Not every principle applies to every plan. State which are relevant and verify compliance for those.
 
 ### API Verification (BLOCKING)
 
@@ -646,42 +740,48 @@ Generate the MINIMUM code that FULLY satisfies every acceptance criterion. This 
 
 Every deliverable item numbered for traceability. This is the **contract** — `/x1-implement` must satisfy every item.
 
-#### Files
-- IMP-001: Create `path/to/file.cs` — [purpose] → US-1
-- IMP-002: Modify `path/to/existing.cs` — [what changes] → US-1
+#### Infrastructure (DI, config, migrations) — implement first, prerequisites for TDD cycle
+- IMP-{PREFIX}-001: Register `ServiceName` in DI container → US-{PREFIX}-1
+- IMP-{PREFIX}-002: Add migration for [schema change] → US-{PREFIX}-1
 
-#### Features / Business Logic
-- IMP-003: [Feature/rule description] → US-1 AC-1
-- IMP-004: [Feature/rule description] → US-1 AC-2
+#### AC-{PREFIX}-1.1: [AC description]
+- IMP-{PREFIX}-003: [TEST] Integration test — [what it verifies E2E] → AC-{PREFIX}-1.1 (write FIRST, expect RED)
+- IMP-{PREFIX}-004: [CODE] [Implementation description] → AC-{PREFIX}-1.1 (write SECOND, expect GREEN)
 
-#### Infrastructure (DI, config, migrations)
-- IMP-005: Register `ServiceName` in DI container → US-1
-- IMP-006: Add migration for [schema change] → US-1
+#### AC-{PREFIX}-1.2: [AC description]
+- IMP-{PREFIX}-005: [TEST] Integration test — [what it verifies E2E] → AC-{PREFIX}-1.2 (write FIRST, expect RED)
+- IMP-{PREFIX}-006: [CODE] [Implementation description] → AC-{PREFIX}-1.2 (write SECOND, expect GREEN)
 
-#### Error Handling & Edge Cases
-- IMP-007: Handle [failure scenario] in [location] → US-1 AC-3
-- IMP-008: Validate [input] at [boundary] → US-2 AC-1
+Each IMP item traces to a User Story and Acceptance Criterion via the epoch-scoped ID.
 
-#### Tests
-- IMP-009: Unit test — [scenario] → US-1 AC-1
-- IMP-010: Integration test — [scenario] → US-2 AC-1
+**TDD Rules:**
+- Every AC produces at least one `[TEST]` + `[CODE]` pair
+- `[TEST]` items are always listed before their corresponding `[CODE]` items
+- Infrastructure IMP items come before all test-code pairs (they're prerequisites)
+- The `[TEST]` and `[CODE]` tags make TDD order explicit and auditable
 
-Each IMP item traces to a User Story (US-N) and optionally an Acceptance Criterion (AC-N).
+**Implementation order:**
+1. Infrastructure (DI, config, migrations, schema) — prerequisites
+2. For each AC, in TDD cycle:
+   a. Write the [TEST] item (expect RED — test fails because code doesn't exist yet)
+   b. Write the [CODE] item (expect GREEN — test passes)
+   c. Refactor if needed
+3. Repeat for next AC
 
 **Total: N items. Implementation is complete when all items are ✅, ⏭️ (justified), or ➖.**
 
-**Traceability check:** Every AC must have at least one IMP item. If an AC has no IMP items, the plan is incomplete.
+**Traceability check:** Every AC must have at least one [TEST]+[CODE] IMP pair. If an AC has no IMP items, the plan is incomplete.
 
 ### Test Traceability Convention
 Tests MUST reference the user story they verify using xUnit Trait attributes:
 
 ```csharp
-[Trait("UserStory", "US-1")]
+[Trait("UserStory", "US-CTX-1")]
 [Fact]
-public async Task HandleVoiceWebhook_InboundCall_RoutesViaLineRental()
+public async Task ProcessLoop_MultiTurnConversation_RetainsContextAcrossTurns()
 ```
 
-- One `[Trait("UserStory", "US-N")]` per test (required)
+- One `[Trait("UserStory", "US-{PREFIX}-N")]` per test (required, epoch-scoped)
 - Test class organization: group by component, tag by US
 - IMP items for tests should specify the US/AC they trace to
 
@@ -695,9 +795,9 @@ This traces every AC through its architectural placement to the code that implem
 
 | US | AC | Layer / Service | Provider? | Observability | IMP (Code) |
 |----|-----|----------------|-----------|---------------|------------|
-| US-1 | AC-1 | CallOrchestrator (Orchestration) | - | Log: "Inbound call routed via LineRental" | IMP-001, IMP-002 |
-| US-1 | AC-2 | CallOrchestrator (Orchestration) | - | Log: "Contact resolved: {contactId}" | IMP-003 |
-| US-1 | AC-3 | TwilioMediaHandler -> extracted setup service (Technical) | IVoiceProvider | Log: "WorkPlan loaded for agent {id}" | IMP-004, IMP-005 |
+| US-VC-1 | AC-VC-1.1 | CallOrchestrator (Orchestration) | - | Log: "Inbound call routed via LineRental" | IMP-VC-001, IMP-VC-002 |
+| US-VC-1 | AC-VC-1.2 | CallOrchestrator (Orchestration) | - | Log: "Contact resolved: {contactId}" | IMP-VC-003 |
+| US-VC-1 | AC-VC-1.3 | TwilioMediaHandler -> extracted setup service (Technical) | IVoiceProvider | Log: "WorkPlan loaded for agent {id}" | IMP-VC-004, IMP-VC-005 |
 
 **Verification checks:**
 - Every AC has at least one row. If an AC has no row, the plan is incomplete.
@@ -710,10 +810,10 @@ This traces every AC through its architectural placement to the code that implem
 
 This traces every testable AC to its test, including WHAT the test verifies architecturally.
 
-| US | AC | IMP (Code) | IMP (Test) | Test Level | What Test Verifies | Gap? |
+| US | AC | IMP [CODE] | IMP [TEST] | Test Level | What Test Verifies | Gap? |
 |----|-----|------------|------------|------------|-------------------|------|
-| US-1 | AC-1 | IMP-001, IMP-002 | IMP-050 | Orchestrator | Mock LineRentalRepo returns bound agent; verify orchestrator passes correct agentDefinitionId downstream | No |
-| US-1 | AC-2 | IMP-003 | IMP-051 | Orchestrator | Mock ContactResolver returns existing contact; verify contact ID flows to conversation creation | No |
+| US-VC-1 | AC-VC-1.1 | IMP-VC-004 | IMP-VC-003 | Orchestrator | Mock LineRentalRepo returns bound agent; verify orchestrator passes correct agentDefinitionId downstream | No |
+| US-VC-1 | AC-VC-1.2 | IMP-VC-006 | IMP-VC-005 | Orchestrator | Mock ContactResolver returns existing contact; verify contact ID flows to conversation creation | No |
 
 **The "What Test Verifies" column is critical.** It forces the plan to specify what the test actually checks, not just that a test exists. This prevents vacuous tests that pass without catching real bugs.
 

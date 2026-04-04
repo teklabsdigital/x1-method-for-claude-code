@@ -184,6 +184,14 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 - Correct layer placement
 - Reuses existing components (DON'T duplicate)
 
+### Architectural Principles Compliance
+- Plan references `docs/architecture/architectural-principles.md`
+- Relevant AR principles identified and verified (AR-1 through AR-7)
+- Relevant NFR principles identified and verified (NFR-1 through NFR-8)
+- State machines are explicit where lifecycle exists (AR-5)
+- No silent failure paths (NFR-3)
+- Event pipeline used for cross-component communication (AR-6)
+
 ### Technical Design Quality
 - Database schema is complete
 - API design follows conventions
@@ -206,6 +214,7 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 - [ ] GAP justifications: Each untested AC has a specific technical reason and alternative verification
 - [ ] Code reuse: Every new class/file justifies why existing code cannot serve the purpose
 - [ ] Repository performance: New repo methods specify access pattern, cardinality, projection needs
+- [ ] Architectural Principles: Relevant AR/NFR principles identified and plan verified against them
 
 ### [CONCEPTUAL] Snippet Verification
 For every snippet marked [CONCEPTUAL] in the plan:

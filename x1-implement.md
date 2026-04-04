@@ -42,11 +42,17 @@ For each IMP item:
 4. Mark as ✅ Done
 
 **Rules:**
-- Implement in dependency order (infrastructure → business logic → tests)
+- Implement in **TDD order**:
+  1. Infrastructure first (DI, config, migrations, schema) — prerequisites
+  2. For each AC (in dependency order):
+     a. Implement the [TEST] item — run it, confirm **RED** (fails because code doesn't exist yet)
+     b. Implement the [CODE] item — run it, confirm **GREEN** (test passes)
+     c. Refactor if needed, confirm still GREEN
+  3. If the plan has no [TEST]/[CODE] pairs, fall back to dependency order
 - Do NOT skip items silently. If an item cannot be implemented, mark it ⏭️ Skipped with a justification and **inform the user immediately**
 - Do NOT batch — complete each item before starting the next
-- Update progress after EVERY item: "Completed IMP-003 (5/47)"
-- When implementing test IMP items, ensure each test has `[Trait("UserStory", "US-N")]` as specified in the plan
+- Update progress after EVERY item: "Completed IMP-CTX-003 (5/47)"
+- When implementing [TEST] IMP items, ensure each test has `[Trait("UserStory", "US-{PREFIX}-N")]` as specified in the plan
 
 ---
 
@@ -63,6 +69,14 @@ Update status:
 - ✅ Verified — exists and matches plan
 - ⚠️ Partial — exists but incomplete
 - ❌ Missing — not found in codebase
+
+**TDD Verification (for plans with [TEST]/[CODE] pairs):**
+For each [TEST] IMP item:
+- Was it implemented before its corresponding [CODE] item?
+- Did it fail (RED) before the code was written?
+- Does it pass (GREEN) after the code was written?
+
+If TDD order was violated (code written before test), note it in the completion report. This is not a blocker but should be flagged.
 - ⏭️ Skipped — intentionally deferred (justification required)
 - ➖ N/A — requirement changed during implementation (justification required)
 
