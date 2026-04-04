@@ -110,6 +110,7 @@ The X1 workflow is: plan, then attack the plan, then implement what survived. By
 | `/x1-git-commit` | Commit with safety checks and proper messages |
 | `/x1-git-hold` | Prevent accidental commits until you're ready |
 | `/x1-handover` | Generate context for continuing in a new session |
+| `/x1-time-analysis` | Estimate cost savings from using X1 — run after ~1 week of usage |
 
 ## Installation
 

@@ -380,6 +380,115 @@ IMPACT:
 
 ---
 
+## Architectural Principles Compliance (MANDATORY)
+
+Before completing any architecture review, verify compliance with the project's architectural principles. Not every principle applies to every review — state which are relevant and verify those.
+
+### Architectural Requirements
+
+**AR-1: Single Responsibility Decomposition**
+Each component owns exactly one concern. Components are named after what they do, and their constructor dependencies reveal their scope.
+- [ ] Each new/modified component owns exactly one concern
+- [ ] Constructor dependencies reveal scope — no hidden responsibilities
+- [ ] A change to one concern doesn't require understanding another
+
+**AR-2: Dependency Inversion**
+All significant collaborators are interfaces. Components depend on abstractions, never on concrete implementations.
+- [ ] All collaborators are interfaces
+- [ ] No concrete dependencies between components
+- [ ] Enables testing without real implementations
+
+**AR-3: Composition Over Inheritance**
+Components compose through injection, not through class hierarchies. Each layer can be replaced or wrapped independently.
+- [ ] No class hierarchies where composition would suffice
+- [ ] Each layer independently replaceable or wrappable
+- [ ] Injection used for composition
+
+**AR-4: Open-Closed Principle**
+Open for extension, closed for modification. Adding a new capability should not require changing existing components.
+- [ ] New capabilities (event sources, tool types, providers) extend, don't modify
+- [ ] Existing components unchanged when new variations are added
+
+**AR-5: Explicit State Machines**
+Lifecycle states are explicit state machines with defined transitions. Invalid transitions throw. State is never implied by checking multiple booleans.
+- [ ] State is managed via explicit state machine, not boolean combinations
+- [ ] Invalid transitions throw (programming errors, not runtime conditions)
+- [ ] Every transition is logged
+- [ ] No ambiguous or "should never happen" states
+
+**AR-6: Event-Driven Architecture**
+All activity produces events through a single event pipeline. Producers don't know who consumes events; they just emit them.
+- [ ] Cross-component communication via events, not direct calls
+- [ ] Event pipeline is the contract between producers and consumers
+- [ ] Producers don't know consumers
+
+**AR-7: Provider Encapsulation**
+Providers encapsulate their internal complexity. Retry, fallback, and internal recovery are provider responsibilities, not caller responsibilities.
+- [ ] Providers own retry, fallback, and recovery internally
+- [ ] Callers consume clean interfaces, not implementation details
+- [ ] No retry/fallback logic leaking into callers
+
+### Non-Functional Requirements
+
+**NFR-1: Testability**
+Max 5 mocked dependencies per component. Pure decision logic extracted as pure functions.
+- [ ] No component requires more than 5 mocked dependencies in test setup
+- [ ] Pure decision logic extracted as pure functions testable without mocks
+- [ ] Every layer boundary has integration tests
+- [ ] Every state machine transition tested under concurrent input
+- [ ] Every persist-then-reload path tested for round-trip fidelity
+
+**NFR-2: Observability**
+Every state transition, decision point, and error is logged with structured context.
+- [ ] Structured logging with instance ID, tenant ID, step number
+- [ ] Events provide real-time visibility
+- [ ] Any production incident diagnosable from logs alone without a debugger
+- [ ] Every multi-turn can be fully reconstructed from events
+
+**NFR-3: Resilience**
+Transient failures retried. Permanent failures surfaced as events. No silent failures.
+- [ ] Transient failures retried with backoff
+- [ ] Permanent failures surfaced as events and logged
+- [ ] Partial state handled explicitly, never silently dropped
+- [ ] No silent failure paths — every catch block retries, raises an event, or throws
+- [ ] No swallowed exceptions
+
+**NFR-4: Resource Efficiency**
+Idle components unloaded. In-memory resource counts bounded. Context growth managed.
+- [ ] Idle resources unloaded from memory
+- [ ] In-memory counts bounded
+- [ ] Memory proportional to active entities, not total entities
+
+**NFR-5: Concurrency Safety**
+Mutual exclusion via state machine design, not ad-hoc locking. Thread-safe collections for queuing.
+- [ ] Mutual exclusion enforced by state machine design, not ad-hoc locks
+- [ ] Thread-safe collections (Channel<T> or ConcurrentQueue) for queuing
+- [ ] State transitions are atomic
+- [ ] No race conditions at boundaries or injection points
+
+**NFR-6: Persistence and Recovery**
+Persisted state is source of truth. Incremental persistence. Lazy reload on demand.
+- [ ] Persisted state is source of truth
+- [ ] State persisted incrementally
+- [ ] Server restart loses only in-progress operation
+- [ ] Lazy reload on demand, not eager
+
+**NFR-7: Real-Time Responsiveness**
+Events stream with minimal latency. No buffering or batching.
+- [ ] Events stream to clients within milliseconds of generation
+- [ ] No buffering or batching of events
+- [ ] Reconnection provides complete sync from appropriate sync point
+- [ ] No stale event delivery or phantom buildup
+
+**NFR-8: Deterministic Lifecycle**
+No ambiguous states. Invalid transitions throw. Every transition logged.
+- [ ] States, boundaries, and transitions are deterministic and predictable
+- [ ] No ambiguous states or "unknown state" code paths
+- [ ] Invalid transitions are programming errors that throw
+- [ ] State machine transitions can be formally verified
+
+---
+
 ## Architectural Decision Checklist
 
 ### SOLID (Applied Pragmatically)
