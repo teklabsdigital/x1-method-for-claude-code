@@ -1,256 +1,163 @@
-# Claude Chaos Demon
+# X1 Method for Claude Code
 
-A collection of custom skills (slash commands) for [Claude Code](https://claude.com/claude-code) that implement a rigorous software development workflow using the Chaos Demon methodology. These commands enforce quality gates, code reviews, and testing strategies to catch bugs before they reach production.
+One architect with [Claude Code](https://claude.com/claude-code) and the X1 Method can deliver in a week what used to take a small team 40-50 weeks. Not by vibe coding — by doing the opposite.
 
-## Overview
+X1 is a set of Claude Code skills that turn AI-assisted development into a **force multiplier for architects**. You focus on what matters — understanding the problem, shaping the architecture, making design decisions — while AI handles the volume. The core idea: **make all the decisions at the plan level, where changes cost nothing, then let the AI execute mechanically against a plan that's already been stress-tested.**
 
-The X1 workflow is a structured approach to software development that emphasizes:
+The result is full traceability from user stories through acceptance criteria, architecture, implementation, and tests. Every test traces to an AC. Every AC traces to a user story. Every implementation item traces to both. Nothing gets lost. Nothing gets skipped.
 
-- **Planning before coding** - Understand requirements and investigate the codebase first
-- **Chaos Demon methodology** - Actively try to break code and find edge cases
-- **Quality gates** - Review plans and code before committing
-- **Iterative refinement** - Get approval at each stage before proceeding
+## Why Not Just "Use AI to Code"?
 
-## Why X1?
+Vibe coding — prompting an AI, glancing at the output, shipping it — works for toy projects. On a real codebase, it falls apart:
 
-Practically, X1 is a namespace prefix that groups related commands together, making them easy to discover and invoke in Claude Code.
+- **It skips understanding.** The AI jumps to code without understanding the problem. Did it solve the right thing? Did it consider edge cases in the requirements?
+- **It duplicates instead of reusing.** It creates a new service when one already exists three files away. Now you have two ways to do the same thing and neither is complete.
+- **It hallucinates APIs.** It calls `GetUser(id)` assuming it returns null on not-found. It actually throws. You find out in production.
+- **It ignores failure.** What if the database is slow? What if two requests hit simultaneously? What if the input is empty, or 10MB, or contains SQL injection?
 
-Philosophically, X represents the unknown - the bugs, edge cases, and failure modes hiding in your code. The Chaos Demon methodology is about hunting these unknowns before they reach production. X1 means "find the unknowns first."
+The code "works" on the happy path. Production is not the happy path.
+
+X1 solves this by making the AI do the hard thinking *before* it writes code — and giving you control over every decision that matters.
+
+## The Core Workflow
+
+```mermaid
+flowchart TD
+    A["🟢 /x1-plan"] --> B["🟠 /x1-test-plan"]
+    B --> C["🔴 /x1-review-plan"]
+    C --> D["🔴 /x1-code-review"]
+    D --> E["🔵 /x1-implement"]
+
+    C -->|Issues found| A
+    D -->|Issues found| A
+```
+
+🟢 **Plan** — problem discovery, user stories, architecture, implementation checklist
+🟠 **Test** — design tests that break things before code exists
+🔴 **Review** — adversarial review of the plan, then its code snippets
+🔵 **Implement** — mechanical TDD execution of what survived
+
+> **Plan mode is required for steps 1–4.** Use `/plan` to enter plan mode before running `/x1-plan`. The entire planning, testing, and review workflow happens in plan mode — Claude researches, designs, and stress-tests without touching your code. Only `/x1-implement` (step 5) runs outside plan mode, where Claude executes against the approved plan.
+
+### 1. Define the plan — `/x1-plan`
+
+This is where most of the value lives. Instead of jumping to code, `/x1-plan` walks through a deliberate sequence that keeps you in the architect's seat:
+
+**Start with the problem, not the solution.** What are you actually solving? Who's affected? What happens if you don't solve it? The skill pushes back on vague requirements and asks the questions you haven't thought of yet. It's a thinking partner, not a yes-machine.
+
+**User stories focused on outcomes.** Not "as a user I want a feature." Acceptance criteria must describe testable end-to-end outcomes — not implementation details. If an AC names a specific class or field, it's wrong. This keeps the plan focused on *what* users need, not *how* the code works internally.
+
+**Codebase investigation — only after requirements are locked.** The AI searches for existing implementations, understands your patterns, and reuses before creating. This is the single biggest waste eliminator. AI assistants love creating new things, and most of the time the thing already exists.
+
+**Architecture with stress testing.** You shape the architecture. The AI stress-tests it with realistic scenarios before any code is written. What happens under concurrent load? What if a dependency is down? Where are the single points of failure? This is where you collaborate — developing scenarios together that expose weaknesses in the design.
+
+**Code snippets verified against the actual codebase.** Every method call, field name, and constructor is checked against reality. Not assumed — verified. Snippets are tagged `[VERIFIED]` or `[CONCEPTUAL]` so you know which are trustworthy.
+
+**A traceable implementation checklist.** Every item numbered, every item traced to a user story and acceptance criterion. TDD-ordered: test first (expect red), code second (expect green). This becomes the contract that implementation executes against.
+
+The plan is the artifact. If the plan is right, implementation is mechanical. If the plan is wrong, no amount of clever coding saves you.
+
+### 2. Design tests that break things — `/x1-test-plan`
+
+Before writing implementation code, design tests that try to destroy it. The X1 philosophy: you're not here to validate that code works, you're here to **prove it doesn't**.
+
+- Break assumptions — what did the developer assume would never happen?
+- Push boundaries — zero, negative, max values, null, empty, 10MB of garbage
+- Race for races — force bad timing in concurrent operations
+- Inject chaos — failures, randomness, delays at the worst possible moments
+
+Every test traces back to an acceptance criterion. Full traceability means you can verify at the end that every requirement has been tested.
+
+### 3. Review the plan adversarially — `/x1-review-plan`
+
+Before a single line of code is written, the plan gets torn apart:
+
+- Are code snippets using real method signatures or hallucinated ones?
+- Does every acceptance criterion have a test? Does every test verify something meaningful?
+- Are there error handling gaps? Missing edge cases? Silent failure paths?
+- Does the architecture comply with project principles?
+- Is there unnecessary code? Could this be simpler?
+
+The reviewer's job is not to approve — it's to find every way the plan will fail. This is the Chaos Demon at work — adversarial by design.
+
+### 4. Review plan code snippets — `/x1-code-review`
+
+The plan's code snippets get a full code review before implementation. Security, architecture, performance, correctness — all checked against the actual codebase, not in isolation.
+
+### 5. Implement mechanically — `/x1-implement`
+
+By now, the plan has been stress-tested, the tests are designed, the code snippets are verified. Implementation follows the checklist item by item with completeness tracking. No creative decisions left — those were all made (and challenged) in the plan.
+
+TDD order enforced: write the test first, watch it fail, write the code, watch it pass. Every item tracked. No silent skips. A blocking completion gate prevents declaring "done" with unresolved items.
+
+At the end, full traceability lets you verify that every user story, every acceptance criterion, every test, and every implementation item is accounted for. Nothing slipped through.
+
+### Why This Order Matters
+
+Vibe coding is: code, then review, then test, then fix. Each stage discovers problems the previous stage created.
+
+The X1 workflow is: plan, then attack the plan, then implement what survived. By the time code is written, most of the bugs have already been found and fixed — in a document, where changing your mind costs nothing.
+
+## Supporting Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/x1-review-git` | Review uncommitted changes against X1 standards |
+| `/x1-audit-plan` | Post-implementation gap analysis — verify 100% plan coverage |
+| `/x1-review-tests` | Review existing tests or generate new ones |
+| `/x1-architecture-review` | Deep architectural analysis |
+| `/x1-problem-solve` | Structured problem diagnosis |
+| `/x1-git-commit` | Commit with safety checks and proper messages |
+| `/x1-git-hold` | Prevent accidental commits until you're ready |
+| `/x1-handover` | Generate context for continuing in a new session |
 
 ## Installation
 
 1. Clone this repository
 2. Copy the `.md` files to your Claude Code skills directory:
-   - **Project-level**: `.claude/commands/` in your project root
    - **User-level**: `~/.claude/commands/` for global availability
+   - **Project-level**: `.claude/commands/` in your project root
 
-Skills are invoked in Claude Code using slash commands (e.g., `/x1-plan`).
+Skills are invoked as slash commands in Claude Code (e.g., `/x1-plan`).
 
-## Commands
+## Origins: The Chaos Demon
 
-### Planning & Design
+The adversarial review methodology within X1 is called the "Chaos Demon" — inspired by [Chaos Engineering](https://en.wikipedia.org/wiki/Chaos_engineering), pioneered by Netflix with [Chaos Monkey](https://netflix.github.io/chaosmonkey/) in 2010. After a major database outage, Netflix started deliberately killing production servers to force engineers to build resilient systems.
 
-| Command | Description |
-|---------|-------------|
-| `/x1-plan` | Problem discovery, user stories, high-level plan, then detailed plan with traceable Implementation Checklist |
-| `/x1-review-plan` | Validate an implementation plan using Chaos Demon methodology before coding begins |
+X1 applies the same adversarial mindset earlier — during planning and code review, not in production. The insight: **it's cheaper to find bugs in a plan than in code, and cheaper in code than in production**.
 
-### Implementation
-
-| Command | Description |
-|---------|-------------|
-| `/x1-implement` | Implement from approved plan with completeness tracking and blocking completion gate |
-| `/x1-audit-plan` | Post-implementation gap analysis — verify 100% plan coverage |
-
-### Code Review
-
-| Command | Description |
-|---------|-------------|
-| `/x1-code-review` | Full code review methodology covering security, architecture, performance, and quality |
-| `/x1-review-git` | Review uncommitted git changes using X1 Code Review standards |
-
-### Testing
-
-| Command | Description |
-|---------|-------------|
-| `/x1-review-tests` | Review existing tests or generate new test plans |
-| `/x1-test-plan` | Strategic test planning template for systematic bug hunting |
-
-### Git Workflow
-
-| Command | Description |
-|---------|-------------|
-| `/x1-git-commit` | Commit changes with proper message formatting and safety checks |
-| `/x1-git-hold` | Activate commit hold - prevents automatic commits until explicitly approved |
-
-### Session Management
-
-| Command | Description |
-|---------|-------------|
-| `/x1-handover` | Generate a context handover prompt to continue work in a new session |
-
-## Workflow
-
-A typical development workflow using these commands:
-
-```
-1. /x1-plan          → Discover problem, user stories, high-level plan, then detailed plan with Implementation Checklist
-2. /x1-review-plan   → Validate plan with Chaos Demon methodology
-3. /x1-implement     → Implement with completeness tracking + completion gate
-4. /x1-audit-plan    → Verify 100% plan coverage (safety net — should find 0 gaps)
-5. /x1-code-review   → Review implementation for bugs and issues
-6. /x1-review-tests  → Review or generate tests
-7. /x1-review-git    → Final review of all changes
-8. /x1-git-commit    → Commit with proper message
-```
-
-Use `/x1-git-hold` at the start of a session to prevent accidental commits until you're ready.
-
-Use `/x1-handover` when ending a session to generate a prompt for continuing in a new context window.
-
-## Chaos Demon Philosophy
-
-### Origins: Inspired by Chaos Engineering
-
-The Chaos Demon methodology is inspired by [Chaos Engineering](https://en.wikipedia.org/wiki/Chaos_engineering), pioneered by Netflix with their [Chaos Monkey](https://netflix.github.io/chaosmonkey/) tool in 2010. After a major database outage, Netflix realized that systems don't fail often enough during development - so they built tools to deliberately break things in production.
-
-Netflix's philosophy was radical: **randomly terminate production servers** to force engineers to build resilient systems. This evolved into the "Simian Army" - Chaos Gorilla (kill entire data centers), Latency Monkey (inject network delays), and more. Today, major companies including Google, Amazon, Microsoft, and Facebook practice Chaos Engineering.
-
-### Shifting Left: From Production to Development
-
-While traditional Chaos Engineering tests **running systems** in production, the Chaos Demon methodology applies the same adversarial mindset **earlier in the development lifecycle**:
-
-| Chaos Engineering (Netflix) | Chaos Demon (X1 Workflow) |
-|---------------------------|------------------|
-| Randomly terminate production servers | Systematically attack code and plans |
-| Test infrastructure resilience | Test code correctness and design |
-| Applied to running systems | Applied during code review and planning |
-| Find failures in production | Find failures before code is written |
-
-The core insight: **it's cheaper to find bugs in a plan than in code, and cheaper to find them in code than in production**.
-
-### The Adversarial Mindset
-
-> Your job is NOT to validate that code works. Your job is to **find every possible way it will fail in production**.
-
-Key principles:
-
-- **Break assumptions** - What did the developer assume would never happen?
-- **Push boundaries** - Test at extremes: zero, negative, max values, null, empty
-- **Race for races** - Force bad timing in concurrent operations
-- **Inject chaos** - Failures, randomness, delays at the worst possible moments
-- **Never mask bugs** - If something feels wrong, investigate it
-
-### Why This Approach Works
-
-**1. Bugs are exponentially cheaper to fix early**
-
-The cost of fixing a bug increases dramatically as it moves through the development lifecycle:
-
-| Stage | Relative Cost |
-|-------|---------------|
-| Requirements/Planning | 1x |
+| Stage | Relative Cost to Fix |
+|-------|---------------------|
+| Planning | 1x |
 | Development | 6x |
 | Testing | 15x |
 | Production | 100x |
 
-By applying adversarial thinking during plan review, we catch design flaws before writing any code.
-
-**2. Developers are naturally optimistic**
-
-When writing code, developers think about the happy path - valid inputs, successful responses, available resources. The Chaos Demon forces consideration of:
-
-- What if the database is slow? Down? Full?
-- What if the user clicks submit twice? Ten times?
-- What if the input is null? Empty? 10MB of garbage?
-- What if two requests modify the same record simultaneously?
-
-**3. Code reviews miss what they don't look for**
-
-Traditional code reviews focus on "does this code do what it's supposed to do?" The Chaos Demon asks "what will make this code fail?" This systematic approach catches entire categories of bugs that casual review misses:
-
-- Race conditions and concurrency issues
-- Resource exhaustion and memory leaks
-- Security vulnerabilities (injection, authorization bypass)
-- Edge cases and boundary conditions
-
-**4. Production failures are predictable**
-
-Most production incidents fall into known categories: null references, timeouts, resource exhaustion, concurrency bugs, missing error handling. The Chaos Demon checklists encode these patterns, ensuring every review considers the most common failure modes.
-
-**5. It builds institutional knowledge**
-
-The structured checklists capture hard-won lessons from past incidents. New team members benefit from accumulated experience without having to learn from their own production failures.
-
-### The "What If" Checklist
-
-For every component, the Chaos Demon asks:
-
-**Network Failures:**
-- What if network is slow? (10 second latency)
-- What if network drops mid-request?
-- What if the external API is down?
-
-**Data Validation:**
-- What if input is null or empty?
-- What if input is 10MB of data?
-- What if input contains `<script>` or `'; DROP TABLE --`?
-
-**Concurrency:**
-- What if two requests happen simultaneously?
-- What if user clicks submit twice?
-- What if a background job runs while user is modifying data?
-
-**Resource Limits:**
-- What if 1000 users hit this endpoint simultaneously?
-- What if the response is 100MB?
-- What if memory usage grows unbounded?
-
-**Observability:**
-- How do we know this is broken in production?
-- What logs will help debug this?
-- How do we reproduce production issues locally?
-
-## Code Review Checklist Highlights
-
-### Critical (Must Fix)
-- Null/undefined safety violations
-- Race conditions in async/concurrent code
-- SQL injection, XSS, secrets in code
-- Resource leaks (connections, streams, subscriptions)
-- Fallback code that hides failures
-
-### Architecture
-- Controllers calling repositories directly (bypass services)
-- Business logic in controllers
-- Missing tenant isolation checks
-- Wrong layer placement
-
-### Performance
-- N+1 queries
-- Unbounded collections
-- Missing pagination
-- Loading entire tables
-
 ## Customization
 
-These skills are designed for .NET and React/TypeScript projects but can be adapted:
+These skills are designed for .NET and React/TypeScript but adapt to any stack:
 
-1. Modify the language-specific sections in `/x1-code-review`
-2. Adjust the architecture layer references to match your stack
-3. Update date/time handling rules for your conventions
+1. Modify language-specific sections in the review skills
+2. Adjust architecture layer references to match your patterns
+3. Update conventions to match your project
 
 ## Requirements
 
-- [Claude Code CLI](https://claude.com/claude-code)
-- Skills support enabled in Claude Code
+- [Claude Code](https://claude.com/claude-code)
 
 ## License
 
-This work is licensed under [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
+[Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-### You are free to:
+**Free for:** Personal projects, educational use, and non-commercial open source.
 
-- **Share** - Copy and redistribute the material in any medium or format
-- **Adapt** - Remix, transform, and build upon the material
-
-### Under the following terms:
-
-- **Attribution** - You must give appropriate credit, provide a link to the license, and indicate if changes were made
-- **NonCommercial** - You may not use the material for commercial purposes without obtaining a commercial license
-
-### Commercial Licensing
-
-**Free for:** Personal projects, educational use, and non-commercial open source projects.
-
-**Commercial use requires a license.** If you're using these commands in a commercial product, for-profit service, or enterprise environment, please contact us:
-
+**Commercial use requires a license.** Contact us:
 - **Email:** office@reqwiseconsulting.com
 - **Website:** [www.reqwiseconsulting.com](https://www.reqwiseconsulting.com)
 
 ## Contributing
 
-Contributions welcome. Please ensure any changes:
-- Follow the existing Chaos Demon philosophy
+Contributions welcome. Ensure changes:
+- Follow the X1 philosophy — adversarial, not optimistic
 - Add concrete failure scenarios, not vague guidelines
 - Include specific, actionable fixes for issues identified
