@@ -39,7 +39,9 @@ You are not here to validate that code works. You are here to **prove it doesn't
 
 ### 1.1 Business Requirements Coverage
 
-**Source**: [Reference business spec and implementation plan]
+**Sources (read BOTH — test design is driven by *what must stay true*, not only *what the feature does*):**
+1. **Requirements** — the `/x1-requirements` artifact in `specs/…` (`US-{EPOCH}-N`, `AC-{EPOCH}-N.M`) → behavioral coverage: every AC → ≥1 test.
+2. **Architecture + invariants** — the plan/spine + the invariant catalog `docs/architecture/architectural-principles.md`. Turn each invariant the feature **touches** (from the plan's Invariant Impact Matrix) into an assertion test via that invariant's ***Observed by*** signal, and turn the spine's **cross-slice integration ACs** into seam/integration tests. Without this input the plan covers only happy-path ACs and misses the invariant/seam failures the harness otherwise finds late.
 
 **Critical User Stories to Test**:
 ```
@@ -57,8 +59,8 @@ Example:
 [For each success criterion, define how you'll verify it]
 ```
 
-### User Story Traceability (MANDATORY)
-Every test case designed in this plan MUST trace to a user story and acceptance criterion.
+### Traceability (MANDATORY — two chains)
+Every test case MUST trace to **either** a user story + acceptance criterion (the behavioral chain) **or** a catalog invariant the feature touches (the invariant chain: `Impact-Matrix invariant → Observed by → Test`). Every AC and every touched invariant has ≥1 test, or a documented justification.
 
 Test IDs should include the US reference: `US1-AC1-001` or document the mapping in the test metadata section.
 

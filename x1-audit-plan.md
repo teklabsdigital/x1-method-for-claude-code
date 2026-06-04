@@ -6,6 +6,12 @@
 
 Audit implementation against a plan to identify gaps. Use this **after implementation** to ensure nothing was missed before considering work complete.
 
+**Inputs (read all that apply):** the **requirements artifact** (`specs/…`, the ACs), the **plan** (the IMP checklist), and — when the feature fanned out — the **spine** (its coverage ledger). The ACs are defined in `specs/…`, not the plan; do not report an AC as a gap just because it isn't restated in the plan.
+
+**Two-pass audit:**
+1. **Requirements coverage** — via the spine's coverage ledger (N>1) or the plan's Traceability Matrix (N=1): every `AC-{EPOCH}-N.M` is owned by exactly one slice/plan and implemented; every touched invariant from the Impact Matrix has a test. *Forward:* no unowned AC. *Backward:* no `IMP-{EPOCH}.{SLICE}` that fails to trace to an AC.
+2. **Plan-item completion** — every IMP item in the (slice) plan is done/justified.
+
 **When to Use:**
 - After implementing from an `/x1-plan` implementation plan
 - After implementing tests from an `/x1-test-plan` test plan

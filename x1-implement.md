@@ -31,6 +31,8 @@ Read the plan and extract ALL IMP-NNN items into a tracking table:
 
 If no Implementation Checklist exists in the plan, STOP and tell the user: "This plan has no Implementation Checklist. Run `/x1-plan` to create a plan with numbered IMP items first."
 
+**Inputs:** load **both** the plan (the IMP checklist — one slice plan at a time if the feature fanned out) **and** its requirements artifact in `specs/…` — the `AC-{EPOCH}-N.M` referenced by `[TEST]` items are defined there, not in the plan. Slice-tagged ids look like `IMP-{EPOCH}.{SLICE}-NNN`.
+
 ---
 
 ## Phase 2: Systematic Implementation
@@ -143,5 +145,8 @@ Then continue implementing the remaining items. Re-run the gate after each pass.
 ## When Complete
 
 Report completion status with gate result.
+
+### Invariant ratchet (MANDATORY check)
+If implementation (or its tests/harness) surfaced a property that **must always hold** but is not yet in `docs/architecture/architectural-principles.md`, flag it: "New candidate invariant: <statement> — Why / Fails as / Observed by." Do not silently absorb it. The formal promotion into the catalog is done by `/x1-architecture-review` (the governance home), but it starts here, while the discovery is fresh — this is how the catalog accrues so the next feature inherits it instead of rediscovering it.
 
 **Next step:** `/x1-audit-plan` for independent verification (should find 0 gaps)

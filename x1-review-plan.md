@@ -184,13 +184,16 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 - Correct layer placement
 - Reuses existing components (DON'T duplicate)
 
-### Architectural Principles Compliance
+### Architectural Principles & Invariants Compliance
 - Plan references `docs/architecture/architectural-principles.md`
 - Relevant AR principles identified and verified (AR-1 through AR-7)
 - Relevant NFR principles identified and verified (NFR-1 through NFR-8)
 - State machines are explicit where lifecycle exists (AR-5)
 - No silent failure paths (NFR-3)
 - Event pipeline used for cross-component communication (AR-6)
+- **Invariant Impact Matrix present**: every catalog invariant the feature touches is listed with *how it is honoured*; no "touched but not honoured" left open.
+- **Invariant Generator ran**: new invariants derived from the feature's deltas are recorded as design constraints (and flagged for the ratchet).
+- **Coverage ledger passes (N > 1)**: *forward* — every AC owned by exactly one slice (0 = gap, >1 = duplication); *backward* — every `IMP-{EPOCH}.{SLICE}` traces to an AC.
 
 ### Technical Design Quality
 - Database schema is complete

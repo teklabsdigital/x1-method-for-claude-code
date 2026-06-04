@@ -12,238 +12,39 @@
 - **Observable:** Every feature must answer "How will we know this is broken in production?"
 - **Testable by design:** Structure code so orchestration-level tests with mocked boundaries can verify real workflows.
 
+This skill owns the **technical** back of the X1 pipeline. It reads the **approved requirements artifact** produced by `/x1-requirements` and authors the architecture and implementation plan(s). It does NOT elicit or re-open user stories — those are locked upstream.
+
 ## Instructions
 
-1. **Discover the problem** - Spend time here. Don't rush to solutions.
-2. **Challenge and think laterally** - Be a thinking partner, not a yes-machine.
-3. **Elicit user stories** - At least one with acceptance criteria before proceeding.
-4. **Present high-level plan** - Conceptual approach, no code, no file paths.
-5. **Wait for acceptance** - Don't investigate codebase until direction approved.
-6. **Investigate codebase** - Only after high-level accepted. Find patterns, reuse.
-7. **Add detail iteratively** - Technical specifics, code snippets, Implementation Checklist.
-8. **Iterate until approved** - Refine based on feedback.
+1. **Load approved requirements** - Read the requirements artifact from `specs/…` (see Phase 0). If none exists, STOP and tell the user to run `/x1-requirements` first.
+2. **Present high-level plan** - Conceptual approach, no code, no file paths. Wait for acceptance.
+3. **Investigate codebase** - Only after high-level accepted. Find patterns, reuse.
+4. **Identify invariants** - Run the Invariant Impact Matrix (reuse known) and the Invariant Generator (derive new) against the catalog at `docs/architecture/architectural-principles.md`.
+5. **Decide cardinality** - Single implementation → one plan inline; multiple → emit an architecture spine + slice manifest + coverage ledger, then plan each slice.
+6. **Add detail iteratively** - Technical specifics, code snippets, Implementation Checklist.
+7. **Iterate until approved** - Refine based on feedback.
 
-**Goal:** Clear problem understanding, codebase-aligned plan with traceable Implementation Checklist, ready for `/x1-implement`.
+**Goal:** Codebase-aligned plan with traceable Implementation Checklist and an honoured invariant set, ready for `/x1-implement`.
 
 **Speed:** Work in parallel wherever possible - read multiple files simultaneously, search client and server concurrently, research while investigating code.
 
 ---
 
-## Phase 1: Problem Discovery
+## Phase 0: Load Approved Requirements (BLOCKING)
 
-Spend time here. Don't rush to solutions. Understand the problem domain.
+This skill begins from locked requirements. Do not re-elicit or edit stories here.
 
-### What problem are you solving?
-- What's the current state? What's wrong with it?
-- What's the desired state? What does success look like?
-- Who is affected? What's the impact?
+1. **Read the requirements artifact** — `specs/user-story.md` (or `specs/<feature>-requirements.md`): the epoch prefix, `US-{EPOCH}-N`, `AC-{EPOCH}-N.M`, the stress scenarios, gap analysis, and rationale. This is the single source of truth for ACs; the plan never invents an AC.
+2. **If it is missing or stories are not approved** → STOP: "No approved requirements found. Run `/x1-requirements` first."
+3. **If a gap surfaces** mid-plan → the new AC goes BACK to `/x1-requirements` for re-approval, then returns here. Slices never mint ACs locally.
 
-### Why does this matter?
-- What happens if we don't solve this?
-- What's the cost of the current state?
-- Are there upstream/downstream effects?
-
-### What have you already tried or considered?
-- Previous approaches and why they didn't work
-- Constraints you've already identified
-- Related work or prior art
-
-### Probe deeper — ask the questions the user hasn't thought of:
-- "You mentioned X — what happens when Y?"
-- "Who else is affected by this besides the obvious users?"
-- "What's the simplest version of this that would still be valuable?"
-- "Is there a reason this hasn't been solved before?"
-- "What would make this problem go away entirely vs just managing it?"
-
-### Challenge and think laterally
-
-**Be a critical thinking partner, not a yes-machine.**
-
-- If an idea seems over-engineered, say so: "This could work, but have you considered [simpler approach]?"
-- If the problem can be reframed, offer alternatives: "Another way to look at this is..."
-- If the user is solving a symptom, probe the root cause: "Is the real problem actually X rather than Y?"
-- Think out-of-the-box — propose approaches the user hasn't considered
-- Present trade-offs honestly: "Approach A is simpler but limits X. Approach B is more work but gives you Y."
-- If something seems like a bad idea, push back respectfully: "I'd caution against that because [reason]. Here's what I'd suggest instead."
-- If the user still wants their approach after hearing alternatives, respect that — it's their codebase
-
-**The most valuable thing in early planning is divergent thinking. Don't converge on a solution too quickly. Explore the problem space.**
-
-**DO NOT propose final solutions in this phase. Understand and challenge first.**
-
-### User Story Workshop (BLOCKING GATE)
-
-**ALL user stories with acceptance criteria must be collaboratively refined and approved before proceeding.**
-
-This is the most important phase of the entire X1 workflow. Requirements errors caught here cost 1x to fix. The same errors caught during implementation cost 15x. In production, 100x.
-
-**Your role: Analyst and critical thinking partner.**
-
-You are not a passive scribe waiting for the user to dictate stories. You are an analyst who:
-- **Challenges every story:** "Do we actually need this? What happens if we don't build it?"
-- **Questions assumptions:** "You said X. What about Y? Have you considered Z?"
-- **Pushes for minimalism:** Fewer stories with precise ACs beats many stories with vague ones. Less is more, but not so little that nuance is lost.
-- **Identifies hidden stories:** "You haven't mentioned [scenario]. Is that in scope or intentionally excluded?"
-- **Splits bloated stories:** If a story has 7+ ACs, it's probably 2-3 stories. Challenge it.
-- **Merges overlapping stories:** If two stories share most ACs, they might be one story.
-- **Questions the "so that":** If the benefit is vague ("so that it works better"), push for specificity.
-- **Eliminates gold-plating:** If an AC describes a nice-to-have, challenge whether it belongs in this iteration.
-
-**Roles must be human stakeholders.**
-- The role in "As [role]" must be a real human: developer, operator, business owner, end user, support agent, etc.
-- "As the system" and "As an AI agent" are **never valid roles**. Reframe: who is the human that observes, benefits from, or is harmed by this behavior?
-- For internal/infrastructure work, the stakeholder is typically a developer (maintainability, testability) or an operator (reliability, observability).
-- Example reframe: "As the system, I need context compaction..." becomes "As an operator, I need the system to manage conversation context size, so that agents don't exceed model limits and fail silently."
-
-**Acceptance criteria must describe testable end-to-end outcomes, not implementation details.**
-- ACs can be technical, but they must test the pipeline across service boundaries, not a single unit in isolation.
-- ACs must not name specific classes, methods, fields, parameters, or database columns. Those details belong in the IMP checklist.
-- Litmus test: can this AC be verified by an integration/E2E test that exercises the real flow across service boundaries? If it can only be verified by inspecting a single class's internal state, it's an implementation detail, not an acceptance criterion.
-- ACs feed directly into `/x1-test-plan` which builds acceptance tests from them. "Field X added to class Y" produces a trivial unit assertion. "Given X, when Y, then Z is observable" produces a test that catches real seam failures.
-- **Why this matters:** Testing breaks down at the seams between services. An AC that names a single class drives a unit test for that class. An AC that describes an E2E outcome drives an integration test that catches the real failures: incorrect handoffs, stale state, missing wiring, broken DI.
-
-**Bad example (system perspective, unit-level ACs, no epoch):**
-```
-US-1: Agent Retains Conversation Context Between Turns
-As an AI agent, I need my conversation context to persist in my
-in-memory message buffer across turns...
-
-AC-1.1: After a multi-turn completes, assistant responses and tool
-results from StepFinishEvent.NewMessages are added to the instance's
-_messages list.
-
-AC-1.2: AgentInstanceRecord.LastContextSizeTokens is updated after
-each multi-turn with the last step's InputTokens.
-```
-Problems: "As an AI agent" is not a human. ACs name internal classes/fields. Tests would only verify a single unit's state, missing seam failures. IDs will collide with every other plan's US-1.
-
-**Good example (human perspective, E2E ACs, epoch-scoped):**
-```
-Epoch: CTX
-
-US-CTX-1: Agents Remember Prior Conversation
-As an operator, I need agents to retain conversation context across
-turns, so that they don't repeat questions or lose track of prior work.
-
-AC-CTX-1.1: Given a multi-turn conversation, when the agent receives
-a follow-up referencing earlier context, the agent responds using that
-context without re-fetching data.
-
-AC-CTX-1.2: Context size is tracked per instance so compaction
-decisions can be made without loading full message history.
-
-AC-CTX-1.3: When context exceeds the compaction threshold, the system
-compacts before the next execution, and the agent continues
-functioning with the compacted context.
-```
-ACs are technical but testable E2E. They exercise hydration + execution + persistence together, catching seam failures. Epoch-scoped IDs are unique across all plans.
-
-**The goal is the MINIMAL set of stories that captures the FULL problem. Not more, not fewer.**
-
-**Process:**
-1. Listen to the problem discovery conversation
-2. Draft an initial set of user stories. Be opinionated. Propose what you think is right.
-3. For each story, state WHY you included it and what you'd lose by cutting it
-4. Challenge the user: "I think US-3 could be merged into US-1. Here's why..."
-5. Ask probing questions about assumptions: "You said contacts should be resolved. What happens with anonymous callers? Is that a separate story or an AC on the existing one?"
-6. Iterate. Add, remove, merge, split based on discussion.
-7. When both sides agree the stories are tight, present the final Gate Document
-8. Ask: "Are these user stories and acceptance criteria complete and accurate? I will not investigate the codebase until you confirm."
-9. Repeat from step 6 if the user has changes
-
-**Analyst Questions to Ask (use judgment, not all apply to every feature):**
-- "What's the simplest version of this that would still solve the core problem?"
-- "If we shipped only US-1, would users get value? Or is US-2 required for it to make sense?"
-- "This AC seems like an implementation detail, not a user-facing behavior. Can we reframe it?"
-- "Are there scenarios you haven't mentioned that would break this?"
-- "Who else is affected besides the primary user?"
-- "What does the user do TODAY without this feature? What's the actual pain?"
-- "Can this AC be verified by a test, or is it too vague to test?"
-
-**Output format (Gate Document):**
-
-```
-## User Stories (APPROVED)
-
-**Epoch:** {PREFIX} (short code derived from feature name, e.g. CTX, AUTH, VC)
-
-### US-{PREFIX}-1: [Title]
-**As** [human stakeholder role], **I want** [capability], **so that** [benefit].
-
-**Acceptance Criteria:**
-- AC-{PREFIX}-1.1: [Testable end-to-end outcome]
-- AC-{PREFIX}-1.2: [Testable end-to-end outcome]
-
-### US-{PREFIX}-2: [Title]
-...
-
-**User confirmed: [date/time or "Yes, approved"]**
-```
-
-**Rules:**
-- Define the **epoch prefix** before writing any stories. Derive it from the feature name (2-4 uppercase letters). All IDs use this prefix throughout the plan.
-- Do NOT investigate the codebase until user stories are approved
-- Do NOT reference file paths, class names, or technical implementation in stories or ACs
-- Do NOT write code snippets or propose architecture
-- Do NOT discuss "how" until the "what" is locked
-- Roles must be **human stakeholders**, never "the system" or "an AI agent"
-- ACs must describe **testable E2E outcomes** that exercise the real flow across service boundaries. No class names, method names, field names, or database columns in ACs.
-- Each AC drives a [TEST]+[CODE] IMP pair (TDD: test written first)
-- Push back on stories that are too broad, too narrow, or unnecessary
-- Every story must justify its existence: what do we lose if we cut it?
-
-User stories are the foundation of the entire X1 workflow:
-- Plan items trace back to user stories
-- Implementation Checklist items map to acceptance criteria
-- Tests verify acceptance criteria are met
-- Audit verifies traceability end-to-end
-
-**The user story gate is the foundation of the entire X1 workflow.**
-
-### Stress Test User Stories (BLOCKING GATE)
-
-**After user stories are approved but BEFORE architecture begins, stress test the acceptance criteria with end-to-end scenarios.**
-
-Requirements that look complete in isolation break when composed. The goal is to find gaps in the ACs by running realistic scenarios that cross multiple stories and multiple concerns simultaneously.
-
-**Process:**
-1. For each user story, generate 3-5 stress scenarios that combine multiple ACs, concurrent operations, or edge conditions
-2. Walk each scenario through the acceptance criteria step by step
-3. At each step ask: "Is there an AC that covers what happens here? If not, we have a gap."
-4. Add missing ACs or refine existing ones based on gaps found
-5. Re-present updated stories for approval
-
-**Stress scenario categories:**
-- **Temporal collisions:** Two things happening at the same time (budget hit while agent is mid-call, campaign paused while contact is being added)
-- **State transitions under load:** What happens at boundaries (last contact completes, budget hits exactly 100%, daily limit reached mid-batch)
-- **Failure during multi-step operations:** Operation fails halfway through (instance creation succeeds for 5 of 10 contacts, then fails)
-- **Ordering assumptions:** Does the system assume A happens before B? What if B happens first?
-- **Cascading effects:** Action on entity A triggers changes to entities B, C, D. Are all downstream effects covered by ACs?
-
-**Example:**
-```
-Scenario: "Budget exhausted mid-batch-operation"
-1. System is processing 10 items with a $50 budget
-2. Item 7 completes at $45 total (80% threshold hit)
-   -> AC gap found: what happens at 80%? No AC covers warning behaviour.
-   -> Added AC for threshold warning.
-3. Item 8 costs $8, pushing total to $53 (over budget)
-   -> AC gap found: guard runs post-task, not mid-task. Budget can overshoot.
-   -> Added AC clarifying post-task check semantics and overshoot tolerance.
-4. Guard suspends processing. But item 9 was already in-flight via the scheduler.
-   -> AC gap found: what about in-flight items when processing is suspended?
-   -> Added AC for idempotent suspension (in-flight items complete, no new items start).
-```
-
-**This step typically finds 3-8 missing or imprecise ACs.** These are the ACs that would otherwise become bugs discovered during implementation or, worse, in production.
-
-**Output:** Updated user stories with stress-test-derived ACs marked (e.g. "AC-X.30: Idempotent operations [stress-tested]"). Present for re-approval before proceeding.
+Carry the epoch prefix forward — it is the key that joins requirements → plan(s) → tests.
 
 ---
 
-## Phase 2: High-Level Plan
+## Phase 1: High-Level Plan
 
-**This phase begins ONLY after the User Story Workshop gate AND Stress Test gate have passed.**
+**This phase begins ONLY after Phase 0 — the approved requirements artifact is loaded.**
 
 Present the approach at a conceptual level. No code. No file paths. Just the shape of the solution.
 
@@ -251,7 +52,7 @@ Present the approach at a conceptual level. No code. No file paths. Just the sha
 [1-2 sentences: what we're solving and why]
 
 ### User Stories
-[List with acceptance criteria — approved in Phase 1]
+[List with acceptance criteria — loaded from the `/x1-requirements` artifact in `specs/…`, not re-authored here]
 
 ### Proposed Approach
 [Conceptual design — how will we solve this? What's the strategy?]
@@ -265,11 +66,11 @@ Present the approach at a conceptual level. No code. No file paths. Just the sha
 
 **Ask:** "Does this direction feel right? Any concerns before I investigate the codebase and add detail?"
 
-**Wait for acceptance before proceeding to Phase 3.**
+**Wait for acceptance before proceeding to Phase 2 (Codebase Investigation).**
 
 ---
 
-## Phase 3: Codebase Investigation
+## Phase 2: Codebase Investigation
 
 Only after the high-level approach is accepted. Investigate **in parallel**:
 
@@ -386,6 +187,40 @@ This project uses TDD. The plan must produce IMP items that enforce the red-gree
 - If the only way to test is to inspect internal state, the behavior isn't observable enough. Add an observable output (return value, event, log, persisted state).
 
 **Exempt from TDD:** Pure infrastructure (DI wiring, config, migrations). These are tested implicitly when the first [TEST] item runs.
+
+### Invariant Impact Matrix (MANDATORY — run BEFORE stress testing)
+
+Reuse the project's invariant catalog so **known** invariants are never re-derived. Load `docs/architecture/architectural-principles.md` (§1 runtime invariants, §2 boundary rules). Produce one table for this feature — each catalog invariant × *does this feature touch it, and how is it honoured?*
+
+| Invariant | Touched? | How honoured |
+|-----------|----------|--------------|
+| INV-DET-1 byte-identical replay | yes/no | ... |
+| INV-CC-1 single writer per stream | yes/no | ... |
+| ... walk every §1/§2 entry ... | | |
+
+- Most features touch 5–8 invariants. **"Touched but not honoured" is a BLOCKER** — fix the design before proceeding.
+- Each touched invariant's ***Observed by*** signal becomes a test case in `/x1-test-plan` (the invariant chain, alongside the AC chain).
+
+### Invariant Generator (MANDATORY — derive NEW invariants at design time)
+
+The Matrix reuses KNOWN invariants; the Generator derives **new** ones *before build*, so the harness confirms invariants rather than discovering them late. Enumerate the feature's architectural **deltas** and run each past the generator questions:
+
+| When the design introduces… | Ask… | → candidate invariant family |
+|---|---|---|
+| new persisted state / fold field | how is it derived? settled or transient? what must it never contradict? | ES / GR |
+| a new writer or shared mutable point | who else can touch this concurrently? what serializes it? | CC |
+| a read of anything that differs run-to-run (time, random, network order, external id) | **does this enter the replayed request?** how is it frozen/injected? | DET |
+| a new event / stream / bracket | what's the single terminal? can it double? what's transient? | GR |
+| a new input source or external sender | is it trusted? where is provenance stamped? what side effects can it reach? | TR |
+| a new side effect / external action | what if it runs twice, or crashes mid-way? what's the idempotency key? | CR |
+| a new status / lifecycle | what are the illegal transitions — internal (throw) or external (ignore)? | SM |
+| a new loop / fan-out / recursion / cost driver | what bounds it? what happens at the bound? | EXE |
+| a new mandatory dependency or default | what if missing/wrong — does it fail loud at startup? | CFG |
+| a new tenant / scope / partition | can data or reach cross this boundary? | ISO |
+
+Plus two reflexes: **negate every Key Decision** ("we chose X; X is only safe if ___" → the blank is a candidate invariant) and **harvest the stress test below** (each seam failure → the invariant the redesign must preserve).
+
+New invariants become **design constraints now** and **harness assertions later**. Durable ones are promoted into `architectural-principles.md` via the **ratchet** (triggered at `/x1-implement` completion, formalized by `/x1-architecture-review`).
 
 ### Architecture Stress Testing (MANDATORY)
 
@@ -564,7 +399,37 @@ When the plan involves new repository methods, new queries, schema changes, or n
 
 ---
 
-## Phase 4: Detailed Plan (On Acceptance)
+## Phase 2.5: Cardinality & Decomposition
+
+Once the high-level architecture is sound and the invariant set is settled, decide whether this is **one** implementation or **many**. One requirements artifact can fan out to multiple implementations, each with its own checklist.
+
+**N = 1 (single implementation):** continue inline. This skill produces one plan doc (`docs/plans/<feature>-x1-plan.md`) with the full IMP checklist. No spine, no ledger. Stop reading this section.
+
+**N > 1 (multiple implementations):** the high-level architecture **is the spine**. Author `docs/plans/<feature>-spine.md` and STOP the detailed checklist here; then re-invoke `/x1-plan --slice <TAG>` once per slice. The spine owns everything shared, so slices never duplicate it:
+
+1. **Shared components** — the building blocks ≥2 slices need (a delivery path, a binding table, a port). Identified here, owned by a foundation slice, consumed by reference — never re-implemented per slice.
+2. **Invariants** — the Impact-Matrix + Generator output. Cross-cutting, so owned by the spine/catalog; slices reference them, never re-derive.
+3. **Slice manifest** — each slice = a **vertical** capability (delivers ACs end-to-end), never a horizontal layer. Declare the slice dependency DAG; implement foundation/shared slices first.
+4. **Cross-slice integration ACs** — the seam scenarios that cross slice boundaries. **Owned by the spine**, tested as integration tests, owned by no single slice. (Gaps live in the seams; give the seams an owner.)
+5. **Coverage ledger** — see below.
+
+### Coverage Ledger (MANDATORY when N > 1)
+
+The cross-document join that makes traceability, dedup, and completeness *computable* across the fan-out. Lives in the spine doc.
+
+```
+## Coverage ledger
+| AC | Owning slice | Consuming slices | Status |
+|----|--------------|------------------|--------|
+| AC-PLAT-3.1 | PLAT.CHAN | PLAT.SUB, PLAT.MON | planned |
+| AC-PLAT-4.2 | PLAT.SCHED | — | planned |
+```
+
+- **Forward check (completeness):** every requirements AC appears with **exactly one** owning slice. **0 owners = gap (BLOCK). >1 owner = duplication** → resolve to one owner + listed consumers.
+- **Backward check (no orphans):** every `IMP-{EPOCH}.{SLICE}-NNN` traces to an AC; a slice's owned-AC set ⊆ requirements ACs (slices never invent ACs).
+- Each slice plan declares, up top: the ACs it **owns** (from the manifest), the spine components it **consumes**, and the invariants **in scope** (from the spine).
+
+## Phase 3: Detailed Plan (On Acceptance)
 
 Add technical specifics that align with the codebase:
 - Technical design details
@@ -644,7 +509,7 @@ Never mark a snippet [VERIFIED] if you haven't read the actual source. x1-review
 
 ---
 
-## Phase 5: Iterate
+## Phase 4: Iterate
 
 - Refine based on feedback
 - Update plan sections as needed
@@ -754,6 +619,8 @@ Every deliverable item numbered for traceability. This is the **contract** — `
 
 Each IMP item traces to a User Story and Acceptance Criterion via the epoch-scoped ID.
 
+**Slice-tagged IDs (when N > 1).** In a multi-slice feature, IMP ids embed the slice tag so the source plan is visible by inspection and ids never collide across slices: `IMP-{EPOCH}.{SLICE}-NNN` (e.g. `IMP-PLAT.SCHED-014`). For a single-implementation feature, the plain `IMP-{PREFIX}-NNN` form is used. The owning slice for each AC comes from the spine's coverage ledger — a slice's checklist only contains ACs it **owns**.
+
 **TDD Rules:**
 - Every AC produces at least one `[TEST]` + `[CODE]` pair
 - `[TEST]` items are always listed before their corresponding `[CODE]` items
@@ -782,8 +649,10 @@ public async Task ProcessLoop_MultiTurnConversation_RetainsContextAcrossTurns()
 ```
 
 - One `[Trait("UserStory", "US-{PREFIX}-N")]` per test (required, epoch-scoped)
-- Test class organization: group by component, tag by US
+- In a multi-slice feature, add `[Trait("Slice", "{EPOCH}.{SLICE}")]` so tests group by slice
+- Test class organization: group by component, tag by US (and slice)
 - IMP items for tests should specify the US/AC they trace to
+- Invariant tests: each invariant the feature touches (Impact Matrix) gets a test realizing its *Observed by*; `/x1-test-plan` authors these alongside the AC tests
 
 ### Traceability Matrix (MANDATORY)
 
@@ -805,6 +674,7 @@ This traces every AC through its architectural placement to the code that implem
 - The "Layer / Service" column names the actual service and its tier (Orchestration, Business, Technical, Repository). This is NOT optional.
 - The "Provider?" column identifies external service dependencies. If populated, the provider interface must exist or be created.
 - The "Observability" column states the key log/metric for this AC. If blank, ask: "How will we know this AC is working in production?"
+- **Multi-slice (N > 1):** add a **Slice** column; an AC's IMP items all belong to its one **owning** slice (per the coverage ledger). An AC owned by >1 slice is duplication — resolve it.
 
 #### Table 2: Implementation to Testing
 
@@ -835,12 +705,15 @@ Bad: "Test that inbound call works"
 
 A plan with >30% untested ACs should justify the gap or restructure code to improve testability.
 
+**Invariant coverage:** every invariant marked *Touched* in the Invariant Impact Matrix has at least one test realizing its *Observed by* signal. An untested touched-invariant is a gap, justified or closed like any AC gap.
+
 #### Orphan Check
 
 After completing both tables:
 - **Orphan IMP items:** Any IMP item that doesn't appear in Table 1 or Table 2 is orphan code. Either trace it to an AC or remove it.
 - **Orphan code snippets:** Any code snippet in the plan that doesn't map to an IMP item is untracked work. Either create an IMP item or remove the snippet.
 - **Orphan tests:** Any test IMP item that doesn't appear in Table 2 is testing something not traced to requirements. Either trace it or question whether it's needed.
+- **Cross-document checks (N > 1, against the spine's coverage ledger):** *forward* — every requirements AC has exactly one owning slice (0 = gap → BLOCK; >1 = duplication → resolve); *backward* — every `IMP-{EPOCH}.{SLICE}` traces to an AC the slice owns; no slice invents an AC.
 
 ---
 
@@ -867,24 +740,28 @@ After completing both tables:
 ## When Complete
 
 Report:
-- Problem clearly articulated
-- User stories captured with acceptance criteria
+- Approved requirements loaded from `/x1-requirements` (epoch + ACs)
 - Architecture approach approved by user
+- Invariant Impact Matrix completed; new invariants from the Generator recorded
+- Cardinality decided (single plan, or spine + slice manifest + coverage ledger)
 - Files to create/modify identified
 - Code snippets aligned with codebase (if detailed plan)
 - Implementation Checklist with numbered IMP-NNN items
 
-**Next step:** `/x1-review-plan` to validate before implementation
+**Inputs:** the approved requirements artifact (`specs/…`) + the invariant catalog (`docs/architecture/architectural-principles.md`).
+**Next step:** `/x1-review-plan` to validate before implementation (or `/x1-plan-to-review` to plan+review in one pass).
 
 ---
 
 ## Congruence with X1 Workflow
 
-This plan output is structured so downstream skills can validate:
+This plan reads the `/x1-requirements` artifact and is structured so downstream skills can validate:
 
 | Plan Section | Downstream Skill |
 |--------------|------------------|
-| User Stories + Acceptance Criteria | `/x1-review-plan` Requirements Coverage |
+| User Stories + Acceptance Criteria (loaded from `/x1-requirements`) | `/x1-review-plan` Requirements Coverage |
+| Invariant Impact Matrix + Generator | `/x1-review-plan` Invariant/Catalog gate · `/x1-test-plan` invariant tests |
+| Coverage ledger (N > 1) | `/x1-review-plan` + `/x1-audit-plan` forward/backward coverage |
 | Architecture Approach + Layer Placement | `/x1-review-plan` Architecture Compliance |
 | Database + API + Error Handling | `/x1-review-plan` Technical Design Quality |
 | UI/UX Design (layout, unity, modes) | `/x1-review-plan` UI/UX Design Clarity |

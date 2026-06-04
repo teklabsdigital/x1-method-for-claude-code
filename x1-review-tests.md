@@ -23,8 +23,9 @@ Ask: **"Review existing tests OR generate new test plan?"**
 - Test names describe what is being tested
 - Edge cases covered (null, empty, boundary values)
 - No flaky tests (random failures)
-- Tests trace to user stories via `[Trait("UserStory", "US-N")]` attributes
-- Every AC from the plan has at least one test, or a documented justification for why not
+- Tests trace to user stories via `[Trait("UserStory", "US-N")]` attributes (AC definitions are the stable source in `specs/…`, not the plan)
+- Every AC has at least one test, or a documented justification for why not
+- **Invariant coverage**: every invariant the feature touches (the plan's Invariant Impact Matrix) has a test realizing its *Observed by* signal; cross-slice/seam integration ACs are tested, not just per-AC behavioral cases
 - **Mock scope is correct**: orchestrators are only mocked in controller tests; internal seams use real implementations
 - **Scope invariants tested**: if the feature involves scoped IDs (instanceId, conversationId, tenantId), isolation tests exist
 - **False confidence check**: at least one test was verified to fail when given wrong inputs/assertions (no tests pass trivially because mocks return expected values)

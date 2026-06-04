@@ -14,164 +14,52 @@
 
 ## Overview
 
-This skill runs the full X1 planning workflow (Phases 1-5) followed by an adversarial Chaos Demon review (Phase 6) and final output (Phase 7), all in a single context window. The review phase has full memory of every assumption, verification, and decision made during planning, eliminating information loss between passes.
+This is the merged **architecture + review** skill: it reads the approved requirements from `/x1-requirements`, runs the technical planning half of `/x1-plan` (architecture, invariants, detailed checklist), then transitions to an adversarial Chaos Demon review — all in a single context window so the review has full memory of every assumption made during planning. **User stories are NOT elicited here** — they are locked upstream by `/x1-requirements`.
 
 ### When to Use This vs Separate Skills
 
 **Use this merged skill when:**
-- Medium-sized features where a single context window suffices
+- Single-implementation / medium features where a single context window suffices
 - Faster turnaround needed, no information loss between planning and review
-- The plan is unlikely to consume the full context window before review begins
 
 **Use separate `/x1-plan` + `/x1-review-plan` when:**
-- Large features where planning alone fills the context window
+- Large or multi-slice features (the spine + N slice plans won't fit one context)
 - You want a different AI perspective on each pass (fresh eyes catch different things)
-- The plan is complex enough that review benefits from starting with a clean slate
+
+Either way, run `/x1-requirements` first — this skill begins from locked requirements.
 
 ## Instructions
 
-1. **Discover the problem** - Spend time here. Don't rush to solutions.
-2. **Challenge and think laterally** - Be a thinking partner, not a yes-machine.
-3. **Elicit user stories** - At least one with acceptance criteria before proceeding.
-4. **Present high-level plan** - Conceptual approach, no code, no file paths.
-5. **Wait for acceptance** - Don't investigate codebase until direction approved.
-6. **Investigate codebase** - Only after high-level accepted. Find patterns, reuse.
-7. **Add detail iteratively** - Technical specifics, code snippets, Implementation Checklist.
-8. **TRANSITION to adversarial mode** - Switch from architect to Chaos Demon.
-9. **Break the plan** - Find every failure mode, gap, and assumption.
-10. **Output corrected plan** - With review findings appended.
+1. **Load approved requirements** - Read the `/x1-requirements` artifact from `specs/…` (Phase 0). If none, STOP and tell the user to run `/x1-requirements`.
+2. **Present high-level plan** - Conceptual approach, no code, no file paths. Wait for acceptance.
+3. **Investigate codebase** - Only after high-level accepted. Find patterns, reuse.
+4. **Identify invariants** - Invariant Impact Matrix (reuse) + Generator (derive) against `docs/architecture/architectural-principles.md`.
+5. **Add detail iteratively** - Technical specifics, code snippets, Implementation Checklist.
+6. **TRANSITION to adversarial mode** - Switch from architect to Chaos Demon.
+7. **Break the plan** - Find every failure mode, gap, and assumption.
+8. **Output corrected plan** - With review findings appended.
 
-**Goal:** Clear problem understanding, codebase-aligned plan with traceable Implementation Checklist, adversarially reviewed and corrected, ready for `/x1-implement`.
+**Goal:** Codebase-aligned plan with traceable Implementation Checklist and honoured invariants, adversarially reviewed and corrected, ready for `/x1-implement`.
 
 **Speed:** Work in parallel wherever possible. Read multiple files simultaneously, search client and server concurrently, research while investigating code.
 
 ---
 
-## Phase 1: Problem Discovery
+## Phase 0: Load Approved Requirements (BLOCKING)
 
-Spend time here. Don't rush to solutions. Understand the problem domain.
+Begin from locked requirements; do not re-elicit or edit stories.
+1. Read the requirements artifact — `specs/user-story.md` (or `specs/<feature>-requirements.md`): epoch, `US-{EPOCH}-N`, `AC-{EPOCH}-N.M`, stress scenarios, gap analysis, rationale. Single source of truth for ACs.
+2. If missing or not approved → STOP: "Run `/x1-requirements` first."
 
-### What problem are you solving?
-- What's the current state? What's wrong with it?
-- What's the desired state? What does success look like?
-- Who is affected? What's the impact?
+This merged skill is for **single-implementation** features. If the architecture turns out to fan out to multiple slices, stop and use separate `/x1-plan` (which emits a spine + slice plans) + `/x1-review-plan`.
 
-### Why does this matter?
-- What happens if we don't solve this?
-- What's the cost of the current state?
-- Are there upstream/downstream effects?
-
-### What have you already tried or considered?
-- Previous approaches and why they didn't work
-- Constraints you've already identified
-- Related work or prior art
-
-### Probe deeper, ask the questions the user hasn't thought of:
-- "You mentioned X, what happens when Y?"
-- "Who else is affected by this besides the obvious users?"
-- "What's the simplest version of this that would still be valuable?"
-- "Is there a reason this hasn't been solved before?"
-- "What would make this problem go away entirely vs just managing it?"
-
-### Challenge and think laterally
-
-**Be a critical thinking partner, not a yes-machine.**
-
-- If an idea seems over-engineered, say so: "This could work, but have you considered [simpler approach]?"
-- If the problem can be reframed, offer alternatives: "Another way to look at this is..."
-- If the user is solving a symptom, probe the root cause: "Is the real problem actually X rather than Y?"
-- Think out-of-the-box. Propose approaches the user hasn't considered.
-- Present trade-offs honestly: "Approach A is simpler but limits X. Approach B is more work but gives you Y."
-- If something seems like a bad idea, push back respectfully: "I'd caution against that because [reason]. Here's what I'd suggest instead."
-- If the user still wants their approach after hearing alternatives, respect that. It's their codebase.
-
-**The most valuable thing in early planning is divergent thinking. Don't converge on a solution too quickly. Explore the problem space.**
-
-**DO NOT propose final solutions in this phase. Understand and challenge first.**
+**Invariants:** in Phase 2 (Codebase Investigation), run the **Invariant Impact Matrix** and **Invariant Generator** exactly as defined in `/x1-plan` — reuse the catalog at `docs/architecture/architectural-principles.md`, derive new invariants from the feature's deltas, and turn each touched invariant's *Observed by* into a test. Cross-slice/coverage-ledger steps do not apply here (single implementation).
 
 ---
 
-## Phase 2: User Story Workshop (BLOCKING GATE)
+## Phase 1: High-Level Plan
 
-**ALL user stories with acceptance criteria must be collaboratively refined and approved before proceeding.**
-
-This is the most important phase of the entire X1 workflow. Requirements errors caught here cost 1x to fix. The same errors caught during implementation cost 15x. In production, 100x.
-
-**Your role: Analyst and critical thinking partner.**
-
-You are not a passive scribe waiting for the user to dictate stories. You are an analyst who:
-- **Challenges every story:** "Do we actually need this? What happens if we don't build it?"
-- **Questions assumptions:** "You said X. What about Y? Have you considered Z?"
-- **Pushes for minimalism:** Fewer stories with precise ACs beats many stories with vague ones. Less is more, but not so little that nuance is lost.
-- **Identifies hidden stories:** "You haven't mentioned [scenario]. Is that in scope or intentionally excluded?"
-- **Splits bloated stories:** If a story has 7+ ACs, it's probably 2-3 stories. Challenge it.
-- **Merges overlapping stories:** If two stories share most ACs, they might be one story.
-- **Questions the "so that":** If the benefit is vague ("so that it works better"), push for specificity.
-- **Eliminates gold-plating:** If an AC describes a nice-to-have, challenge whether it belongs in this iteration.
-
-**The goal is the MINIMAL set of stories that captures the FULL problem. Not more, not fewer.**
-
-**Process:**
-1. Listen to the problem discovery conversation
-2. Draft an initial set of user stories. Be opinionated. Propose what you think is right.
-3. For each story, state WHY you included it and what you'd lose by cutting it
-4. Challenge the user: "I think US-3 could be merged into US-1. Here's why..."
-5. Ask probing questions about assumptions: "You said contacts should be resolved. What happens with anonymous callers? Is that a separate story or an AC on the existing one?"
-6. Iterate. Add, remove, merge, split based on discussion.
-7. When both sides agree the stories are tight, present the final Gate Document
-8. Ask: "Are these user stories and acceptance criteria complete and accurate? I will not investigate the codebase until you confirm."
-9. Repeat from step 6 if the user has changes
-
-**Analyst Questions to Ask (use judgment, not all apply to every feature):**
-- "What's the simplest version of this that would still solve the core problem?"
-- "If we shipped only US-1, would users get value? Or is US-2 required for it to make sense?"
-- "This AC seems like an implementation detail, not a user-facing behavior. Can we reframe it?"
-- "Are there scenarios you haven't mentioned that would break this?"
-- "Who else is affected besides the primary user?"
-- "What does the user do TODAY without this feature? What's the actual pain?"
-- "Can this AC be verified by a test, or is it too vague to test?"
-
-**Output format (Gate Document):**
-
-```
-## User Stories (APPROVED)
-
-### US-1: [Title]
-**As** [role], **I want** [capability], **so that** [benefit].
-
-**Acceptance Criteria:**
-- AC-1: [Specific, testable criterion]
-- AC-2: [Specific, testable criterion]
-
-### US-2: [Title]
-...
-
-**User confirmed: [date/time or "Yes, approved"]**
-```
-
-**Rules:**
-- Do NOT investigate the codebase until user stories are approved
-- Do NOT reference file paths, class names, or technical implementation
-- Do NOT write code snippets or propose architecture
-- Do NOT discuss "how" until the "what" is locked
-- Acceptance criteria must be specific and testable
-- Each AC drives at least one IMP item and ideally one test
-- Push back on stories that are too broad, too narrow, or unnecessary
-- Every story must justify its existence: what do we lose if we cut it?
-
-User stories are the foundation of the entire X1 workflow:
-- Plan items trace back to user stories
-- Implementation Checklist items map to acceptance criteria
-- Tests verify acceptance criteria are met
-- Audit verifies traceability end-to-end
-
-**The user story gate is the foundation of the entire X1 workflow.**
-
----
-
-## Phase 3: High-Level Plan
-
-**This phase begins ONLY after the User Story Workshop gate has passed (all user stories approved).**
+**This phase begins ONLY after Phase 0 — the approved requirements artifact is loaded.**
 
 Present the approach at a conceptual level. No code. No file paths. Just the shape of the solution.
 
@@ -179,7 +67,7 @@ Present the approach at a conceptual level. No code. No file paths. Just the sha
 [1-2 sentences: what we're solving and why]
 
 ### User Stories
-[List with acceptance criteria, approved in Phase 2]
+[List with acceptance criteria — loaded from the `/x1-requirements` artifact in `specs/…`, not re-authored here]
 
 ### Proposed Approach
 [Conceptual design. How will we solve this? What's the strategy?]
@@ -197,7 +85,7 @@ Present the approach at a conceptual level. No code. No file paths. Just the sha
 
 ---
 
-## Phase 4: Codebase Investigation
+## Phase 2: Codebase Investigation
 
 Only after the high-level approach is accepted. Investigate **in parallel**:
 
@@ -388,7 +276,7 @@ When the plan involves new repository methods, new queries, schema changes, or n
 
 ---
 
-## Phase 5: Detailed Plan
+## Phase 3: Detailed Plan
 
 Add technical specifics that align with the codebase:
 - Technical design details
@@ -462,7 +350,7 @@ Mark each snippet:
 - **[VERIFIED]** Written against actual API read from codebase. Cite file:line for all referenced types/methods.
 - **[CONCEPTUAL]** Pseudocode showing intent. Must be verified during implementation.
 
-Never mark a snippet [VERIFIED] if you haven't read the actual source. Phase 6 will challenge [CONCEPTUAL] snippets and may reject the plan if too many are unverified.
+Never mark a snippet [VERIFIED] if you haven't read the actual source. Phase 4 will challenge [CONCEPTUAL] snippets and may reject the plan if too many are unverified.
 
 ### Code Generation Discipline (MANDATORY)
 
@@ -490,7 +378,7 @@ Generate the MINIMUM code that FULLY satisfies every acceptance criterion. This 
 
 ### Plan Output Format
 
-Structure plan sections to align with what Phase 6 will validate:
+Structure plan sections to align with what Phase 4 (Chaos Demon Review) will validate:
 
 #### Problem Statement
 [What we're solving, 1-2 sentences]
@@ -653,7 +541,7 @@ You have full memory of every assumption, every "should work" moment, every area
 
 ---
 
-## Phase 6: Chaos Demon Review
+## Phase 4: Chaos Demon Review
 
 ### The "What If" Checklist
 
@@ -759,7 +647,8 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 ### Review Checklist
 
 #### Plan Quality Gates
-- [ ] User Story Workshop gate passed: ALL stories approved before codebase investigation
+- [ ] Requirements loaded: approved `/x1-requirements` artifact present in `specs/…` before codebase investigation
+- [ ] Invariant Impact Matrix present; new invariants from the Generator recorded
 - [ ] API Verification: All code snippets cite actual method signatures with file:line references
 - [ ] Snippet confidence: All snippets marked [VERIFIED] or [CONCEPTUAL]
 - [ ] Fail-fast: No fallback patterns in code snippets (no `?? default`, no silent catch)
@@ -836,7 +725,7 @@ For every snippet marked [CONCEPTUAL] in the plan:
 
 ---
 
-## Phase 7: Output
+## Phase 5: Output
 
 After the Chaos Demon review, produce the final corrected plan with review findings appended.
 
